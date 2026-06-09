@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+websockets
+numpy
+scipy
+# tflite-runtime (Omit from requirements.txt to avoid pip errors, inference.py handles its absence)

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Arrhythmia Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js for History -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="alert-modal" class="hidden">
+        <div class="alert-content">
+            <h1 id="alert-title">DANGER</h1>
+            <p id="alert-msg">Condition detected</p>
+            <button onclick="dismissAlert()">Dismiss</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="logo">🫀 ECG Monitor</div>
+        <div class="controls">
+            <span id="conn-status" class="status-indicator offline">● Offline</span>
+            <button id="theme-toggle" onclick="toggleTheme()">Toggle Modern Theme</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Top Row: Waveform and Vitals -->
+        <section class="top-row">
+            <div class="card waveform-card">
+                <h2>Real-Time Waveform</h2>
+                <div class="canvas-container">
+                    <canvas id="ecg-canvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="card vitals-card">
+                <h2>Vitals</h2>
+                <div class="vital-row">
+                    <div class="vital-label">Heart Rate</div>
+                    <div class="vital-value" id="bpm-val">-- <span class="unit">BPM</span></div>
+                </div>
+                <div class="vital-row">
+                    <div class="vital-label">Rhythm</div>
+                    <div class="vital-value rhythm-normal" id="rhythm-val">Awaiting Data</div>
+                </div>
+                <div class="vital-row">
+                    <div class="vital-label">Activity</div>
+                    <div class="vital-value" id="activity-val">--</div>
+                </div>
+                <div class="vital-row">
+                    <div class="vital-label">HRV (SDNN)</div>
+                    <div class="vital-value" id="hrv-val">-- <span class="unit">ms</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Middle Row: 24h History -->
+        <section class="card history-card">
+            <div class="card-header">
+                <h2>24-Hour History</h2>
+                <div class="history-controls">
+                    <button onclick="fetchHistory(1)">1h</button>
+                    <button onclick="fetchHistory(6)">6h</button>
+                    <button onclick="fetchHistory(24)">24h</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="history-chart"></canvas>
+            </div>
+        </section>
+
+        <!-- Bottom Row: Analytics -->
+        <section class="card analytics-card">
+            <h2>Peak Analysis</h2>
+            <div class="analytics-grid">
+                <div class="stat-box">
+                    <h3>Highest HR</h3>
+                    <div id="peak-hr-val" class="stat-val">--</div>
+                    <div id="peak-hr-time" class="stat-sub">--</div>
+                </div>
+                <div class="stat-box">
+                    <h3>Lowest HR</h3>
+                    <div id="low-hr-val" class="stat-val">--</div>
+                    <div id="low-hr-time" class="stat-sub">--</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
