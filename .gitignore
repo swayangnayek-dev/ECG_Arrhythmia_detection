@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+6_backend/data/ecg_history.json
+.vscode/
