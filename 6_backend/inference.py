@@ -18,10 +18,6 @@ class InferenceEngine:
         self.input_details = None
         self.output_details = None
         
-        # Confidence tracking
-        self.consecutive_abnormal = 0
-        self.last_abnormal_class = CLASS_NORMAL
-        
         self._load_model()
 
     def _load_model(self):
@@ -41,7 +37,7 @@ class InferenceEngine:
             self.mock_mode = True
 
     def invoke(self, normalized_segment):
-        """Returns (predicted_class_name, confidence, trigger_alert)."""
+        """Returns (predicted_class_name, confidence)."""
         if self.mock_mode:
             return self._mock_invoke()
             
@@ -72,8 +68,8 @@ class InferenceEngine:
             
         except Exception as e:
             print(f"Inference error: {e}")
-            return "Error", 0.0, False
-
+            return "Error", 0.0
+            
         return self._track_confidence(pred_class, confidence)
 
     def _mock_invoke(self):
@@ -89,20 +85,5 @@ class InferenceEngine:
         return self._track_confidence(pred_class, confidence)
 
     def _track_confidence(self, pred_class, confidence):
-        trigger_alert = False
-        
-        if pred_class != CLASS_NORMAL and confidence >= CONFIDENCE_THRESHOLD:
-            if pred_class == self.last_abnormal_class:
-                self.consecutive_abnormal += 1
-            else:
-                self.consecutive_abnormal = 1
-                self.last_abnormal_class = pred_class
-                
-            if self.consecutive_abnormal >= CONSECUTIVE_WINDOWS:
-                trigger_alert = True
-                self.consecutive_abnormal = 0 # reset after trigger
-        else:
-            self.consecutive_abnormal = 0
-            
         class_name = CLASS_NAMES.get(pred_class, "Unknown")
-        return class_name, confidence, trigger_alert
+        return class_name, confidence

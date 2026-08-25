@@ -48,6 +48,9 @@ class HistoryStore:
                 # ISO format parse
                 r_time = datetime.fromisoformat(r["ts"])
                 if r_time >= cutoff_time:
+                    # Sanitize activity to be only 'Resting' or 'Walking'
+                    if r.get("activity") not in ["Resting", "Walking"]:
+                        r["activity"] = "Walking" if r.get("hr", 0) > 85 else "Resting"
                     valid_records.append(r)
             except Exception:
                 pass

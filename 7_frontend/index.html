@@ -3,93 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECG Arrhythmia Dashboard</title>
+    <title>CardioShield AI - Live AD8232 & ESP32 Arrhythmia Telemetry</title>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <!-- Chart.js for History -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div id="alert-modal" class="hidden">
-        <div class="alert-content">
-            <h1 id="alert-title">DANGER</h1>
-            <p id="alert-msg">Condition detected</p>
-            <button onclick="dismissAlert()">Dismiss</button>
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="brand-badge">
+                <div class="pulse-ring">
+                    <span class="heart-emoji">🫀</span>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-name">CardioShield <span class="badge-tag">AI EDGE</span></div>
+                    <div class="brand-subtitle">AD8232 & ESP32 Real-Time Diagnostic Telemetry</div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <header>
-        <div class="logo">🫀 ECG Monitor</div>
-        <div class="controls">
-            <span id="conn-status" class="status-indicator offline">● Offline</span>
-            <button id="theme-toggle" onclick="toggleTheme()">Toggle Modern Theme</button>
+        <!-- Simulation State Selector in Header -->
+        <div class="header-center">
+            <div class="sim-selector-pill">
+                <span class="sim-label">SIMULATION MODE:</span>
+                <div class="sim-btn-group">
+                    <button id="btn-mode-resting" class="sim-pill-btn active" onclick="setSimulationMode('resting')">
+                        <span class="dot-status green"></span> Resting
+                    </button>
+                    <button id="btn-mode-walking" class="sim-pill-btn" onclick="setSimulationMode('walking')">
+                        <span class="dot-status yellow"></span> Walking
+                    </button>
+                    <button id="btn-mode-auto" class="sim-pill-btn" onclick="setSimulationMode('auto')">
+                        <span class="dot-status blue"></span> Auto Cycle
+                    </button>
+                </div>
+                <button id="btn-trigger-pvc" class="pvc-pill-btn" onclick="triggerPvc()" title="Inject a single Premature Ventricular Contraction">
+                    ⚡ Inject PVC
+                </button>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="connection-status-chip online" id="conn-status-chip">
+                <span class="live-blink"></span>
+                <span id="conn-status-text">ESP32 Connected</span>
+            </div>
+            <button id="audio-toggle-btn" class="util-btn" onclick="toggleAudio()" title="Toggle Heartbeat Sound">
+                🔊 Sound
+            </button>
+            <button id="sim-toggle-btn" class="util-btn" onclick="toggleSimulation()" title="Pause/Resume Stream">
+                ⏸ Pause
+            </button>
+            <button id="theme-toggle" class="util-btn" onclick="toggleTheme()" title="Toggle Visual Theme">
+                🌓 Theme
+            </button>
         </div>
     </header>
 
-    <main>
-        <!-- Top Row: Waveform and Vitals -->
-        <section class="top-row">
-            <div class="card waveform-card">
-                <h2>Real-Time Waveform</h2>
-                <div class="canvas-container">
-                    <canvas id="ecg-canvas"></canvas>
+    <!-- Main Content Container -->
+    <div class="app-layout">
+
+        <!-- Top Row: Hardware Telemetry Strip -->
+        <section class="telemetry-bar">
+            <!-- Sensor -->
+            <div class="telemetry-item">
+                <div class="telemetry-icon">🩻</div>
+                <div class="telemetry-body">
+                    <div class="telemetry-title">AD8232 Analog Front-End</div>
+                    <div class="telemetry-val text-emerald">RA, LA, RL (Attached)</div>
+                    <div class="telemetry-sub">CMRR: 80 dB • Bandwidth: 0.5-40 Hz</div>
                 </div>
             </div>
-            
-            <div class="card vitals-card">
-                <h2>Vitals</h2>
-                <div class="vital-row">
-                    <div class="vital-label">Heart Rate</div>
-                    <div class="vital-value" id="bpm-val">-- <span class="unit">BPM</span></div>
+
+            <!-- MCU -->
+            <div class="telemetry-item">
+                <div class="telemetry-icon">⚡</div>
+                <div class="telemetry-body">
+                    <div class="telemetry-title">ESP32 Microcontroller</div>
+                    <div class="telemetry-val">12-Bit SAR ADC (GPIO36)</div>
+                    <div class="telemetry-sub">Sampling Rate: 250 SPS @ 3.3V</div>
                 </div>
-                <div class="vital-row">
-                    <div class="vital-label">Rhythm</div>
-                    <div class="vital-value rhythm-normal" id="rhythm-val">Awaiting Data</div>
+            </div>
+
+            <!-- Wireless Link -->
+            <div class="telemetry-item">
+                <div class="telemetry-icon">📡</div>
+                <div class="telemetry-body">
+                    <div class="telemetry-title">Wi-Fi & WebSocket Stream</div>
+                    <div class="telemetry-val text-cyan" id="hw-rssi">-56 dBm (Excellent)</div>
+                    <div class="telemetry-sub">IP: 192.168.1.142 • Ping: <span id="hw-latency">11.4 ms</span></div>
                 </div>
-                <div class="vital-row">
-                    <div class="vital-label">Activity</div>
-                    <div class="vital-value" id="activity-val">--</div>
-                </div>
-                <div class="vital-row">
-                    <div class="vital-label">HRV (SDNN)</div>
-                    <div class="vital-value" id="hrv-val">-- <span class="unit">ms</span></div>
+            </div>
+
+            <!-- Purification SNR Gain -->
+            <div class="telemetry-item">
+                <div class="telemetry-icon">🔬</div>
+                <div class="telemetry-body">
+                    <div class="telemetry-title">DSP Purification Gain</div>
+                    <div class="telemetry-val text-emerald"><span id="metric-raw-snr" class="text-amber">8.4 dB</span> ➔ <span id="metric-clean-snr" class="text-emerald">32.1 dB</span></div>
+                    <div class="telemetry-sub">50Hz Rejection: 99.4% (-44.6 dB)</div>
                 </div>
             </div>
         </section>
 
-        <!-- Middle Row: 24h History -->
-        <section class="card history-card">
+        <!-- Two-Column Primary Workspace -->
+        <div class="workspace-grid">
+
+            <!-- LEFT COLUMN: Oscilloscope, Purification Pipeline, and Holter History (65%) -->
+            <div class="column-left">
+
+                <!-- 1. Real-Time Oscilloscope Card -->
+                <div class="card card-oscilloscope">
+                    <div class="card-header">
+                        <div class="header-info">
+                            <div class="card-title">Real-Time Waveform Monitor</div>
+                            <div class="card-desc">Simultaneous Raw AD8232 ADC Signal vs Clean Filtered Clinical ECG</div>
+                        </div>
+                        <div class="view-mode-tabs">
+                            <button class="view-tab active" id="view-mode-dual" onclick="setOscilloscopeMode('dual')">Dual Split</button>
+                            <button class="view-tab" id="view-mode-overlay" onclick="setOscilloscopeMode('overlay')">Overlay</button>
+                            <button class="view-tab" id="view-mode-clean" onclick="setOscilloscopeMode('clean')">Purified Only</button>
+                        </div>
+                    </div>
+
+                    <!-- Dual Canvas Container -->
+                    <div class="canvas-stack">
+                        <!-- Raw Waveform Box -->
+                        <div class="oscilloscope-track" id="raw-waveform-wrapper">
+                            <div class="track-header raw-header">
+                                <span class="badge-dot dot-amber"></span>
+                                <span class="track-title">RAW AD8232 SIGNAL (12-bit ADC 0-4095 + Thoracic Breathing Wander + 50Hz Mains Noise)</span>
+                                <span class="track-meta text-amber">UNFILTERED</span>
+                            </div>
+                            <div class="canvas-wrapper">
+                                <canvas id="ecg-raw-canvas"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Purified Clinical Waveform Box -->
+                        <div class="oscilloscope-track" id="clean-waveform-wrapper">
+                            <div class="track-header clean-header">
+                                <span class="badge-dot dot-emerald"></span>
+                                <span class="track-title" id="clean-track-title">PURIFIED CLINICAL ECG (0.5-45Hz Bandpass • Wavelet Denoised • R-Peaks Highlighted)</span>
+                                <span class="track-meta text-emerald">CLEAN CLINICAL</span>
+                            </div>
+                            <div class="canvas-wrapper">
+                                <canvas id="ecg-canvas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signal Status Legend Footer -->
+                    <div class="oscilloscope-footer">
+                        <div class="legend-chip">
+                            <span class="legend-line amber"></span> Raw Sensor
+                        </div>
+                        <div class="legend-chip">
+                            <span class="legend-line green"></span> Purified ECG
+                        </div>
+                        <div class="legend-chip">
+                            <span class="legend-dot green"></span> R-Peak Trigger
+                        </div>
+                        <div class="stat-pill">Sweep: <strong>250 mm/s</strong></div>
+                        <div class="stat-pill">Scale: <strong>10 mm/mV</strong></div>
+                    </div>
+                </div>
+
+                <!-- 3. Holter History & Peak Analytics Card -->
+                <div class="card card-history">
+                    <div class="card-header">
+                        <div class="header-info">
+                            <div class="card-title">📈 Continuous Holter Trends & Peak Telemetry</div>
+                            <div class="card-desc">Historical heart rate variation with annotated arrhythmia occurrences</div>
+                        </div>
+                        <div class="history-filter-tabs">
+                            <button class="history-tab active" onclick="fetchHistory(1)">1 Hour</button>
+                            <button class="history-tab" onclick="fetchHistory(6)">6 Hours</button>
+                            <button class="history-tab" onclick="fetchHistory(24)">24 Hours</button>
+                        </div>
+                    </div>
+
+                    <div class="history-layout">
+                        <!-- Chart Area -->
+                        <div class="chart-box">
+                            <canvas id="history-chart"></canvas>
+                        </div>
+
+                        <!-- Peak Stats Summary -->
+                        <div class="peaks-sidebar">
+                            <div class="peak-card">
+                                <div class="peak-badge text-amber">▲ HIGHEST HR</div>
+                                <div class="peak-value" id="peak-hr-val">--</div>
+                                <div class="peak-time" id="peak-hr-time">--</div>
+                            </div>
+                            <div class="peak-card">
+                                <div class="peak-badge text-cyan">▼ LOWEST HR</div>
+                                <div class="peak-value" id="low-hr-val">--</div>
+                                <div class="peak-time" id="low-hr-time">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Vitals, Autonomic Stress & Edge AI (35%) -->
+            <div class="column-right">
+
+                <!-- 1. Live Cardiac Vitals Hero Card -->
+                <div class="card card-vitals">
+                    <div class="card-header-compact">
+                        <span class="card-title">🫀 Live Vitals Telemetry</span>
+                        <span class="live-pill-emerald">● 250 SPS STREAM</span>
+                    </div>
+
+                    <!-- Heart Rate Hero Display with Pulsing Icon -->
+                    <div class="bpm-hero-box">
+                        <div class="heart-circle" id="heart-anim-box">
+                            <span class="heart-glyph">❤️</span>
+                        </div>
+                        <div class="bpm-number-wrap">
+                            <div class="bpm-number" id="bpm-val">--</div>
+                            <div class="bpm-unit">BPM</div>
+                        </div>
+                    </div>
+
+                    <!-- Vitals Grid List -->
+                    <div class="vitals-matrix">
+                        <div class="vital-tile">
+                            <div class="tile-label">AI RHYTHM DIAGNOSIS</div>
+                            <div class="rhythm-chip rhythm-normal" id="rhythm-val">Awaiting Data</div>
+                        </div>
+
+                        <div class="vital-tile">
+                            <div class="tile-label">PHYSIOLOGICAL STATE</div>
+                            <div class="tile-value text-cyan" id="activity-val">Resting Calm</div>
+                        </div>
+
+                        <div class="vital-tile">
+                            <div class="tile-label">HRV (SDNN)</div>
+                            <div class="tile-value" id="hrv-val">-- <span class="unit">ms</span></div>
+                        </div>
+
+                        <div class="vital-tile">
+                            <div class="tile-label">HRV (RMSSD)</div>
+                            <div class="tile-value" id="rmssd-val">-- <span class="unit">ms</span></div>
+                        </div>
+
+                        <div class="vital-tile">
+                            <div class="tile-label">AVG R-R INTERVAL</div>
+                            <div class="tile-value" id="rr-val">-- <span class="unit">ms</span></div>
+                        </div>
+
+                        <div class="vital-tile">
+                            <div class="tile-label">PACKETS INGESTED</div>
+                            <div class="tile-value" id="hw-packets">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Autonomic Stress / Anxiety Gauge Card -->
+                <div class="card card-stress">
+                    <div class="card-header-compact">
+                        <span class="card-title">🧠 Autonomic Stress / Anxiety Index</span>
+                        <span class="stress-badge calm" id="stress-badge">CALM</span>
+                    </div>
+
+                    <div class="stress-meter-section">
+                        <div class="meter-bar-track">
+                            <div class="meter-bar-fill" id="stress-bar-fill" style="width: 25%;"></div>
+                        </div>
+                        <div class="meter-scale-labels">
+                            <span>Parasympathetic (Calm)</span>
+                            <span class="meter-score-text" id="stress-index-val">25 / 100</span>
+                            <span>Sympathetic (Anxious)</span>
+                        </div>
+                    </div>
+
+                    <div class="clinical-note-box" id="stress-explainer-txt">
+                        Vagal tone dominant. Healthy respiratory sinus arrhythmia present with deep rhythmic autonomic stability.
+                    </div>
+                </div>
+
+                <!-- 3. Edge AI Softmax Probability Breakdown Card -->
+                <div class="card card-ml">
+                    <div class="card-header-compact">
+                        <span class="card-title">🤖 TinyML Softmax Distribution</span>
+                        <span class="confidence-tag" id="ml-conf-top">98% Confidence</span>
+                    </div>
+
+                    <div class="prob-list">
+                        <!-- Normal -->
+                        <div class="prob-item">
+                            <div class="prob-header">
+                                <span class="prob-name">Normal Sinus Rhythm</span>
+                                <span class="prob-percent text-emerald" id="prob-normal-txt">97%</span>
+                            </div>
+                            <div class="prob-track">
+                                <div class="prob-fill fill-normal" id="prob-normal-bar" style="width: 97%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Anxious -->
+                        <div class="prob-item">
+                            <div class="prob-header">
+                                <span class="prob-name">Elevated Sinus (Anxious)</span>
+                                <span class="prob-percent text-amber" id="prob-anxious-txt">2%</span>
+                            </div>
+                            <div class="prob-track">
+                                <div class="prob-fill fill-anxious" id="prob-anxious-bar" style="width: 2%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- PVC -->
+                        <div class="prob-item">
+                            <div class="prob-header">
+                                <span class="prob-name">Premature Ventricular (PVC)</span>
+                                <span class="prob-percent text-danger" id="prob-pvc-txt">1%</span>
+                            </div>
+                            <div class="prob-track">
+                                <div class="prob-fill fill-pvc" id="prob-pvc-bar" style="width: 1%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- AFib -->
+                        <div class="prob-item">
+                            <div class="prob-header">
+                                <span class="prob-name">Atrial Fibrillation (AFib)</span>
+                                <span class="prob-percent text-purple" id="prob-afib-txt">0%</span>
+                            </div>
+                            <div class="prob-track">
+                                <div class="prob-fill fill-afib" id="prob-afib-bar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ml-footer-note">
+                        Model: <strong>1D-CNN Int8 Quantized</strong> • Ingest: <strong>2-sec Sliding Window</strong>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- 2. Signal Purification & AI Pipeline Card -->
+        <div class="card card-pipeline">
             <div class="card-header">
-                <h2>24-Hour History</h2>
-                <div class="history-controls">
-                    <button onclick="fetchHistory(1)">1h</button>
-                    <button onclick="fetchHistory(6)">6h</button>
-                    <button onclick="fetchHistory(24)">24h</button>
+                <div class="header-info">
+                    <div class="card-title">🔬 How Signal Purification & Edge AI Work</div>
+                    <div class="card-desc">Step-by-step real-time signal processing and TinyML neural classification</div>
+                </div>
+                <div class="pipeline-live-pill">
+                    <span class="live-dot"></span> Pipeline Active
                 </div>
             </div>
-            <div class="chart-container">
-                <canvas id="history-chart"></canvas>
-            </div>
-        </section>
 
-        <!-- Bottom Row: Analytics -->
-        <section class="card analytics-card">
-            <h2>Peak Analysis</h2>
-            <div class="analytics-grid">
-                <div class="stat-box">
-                    <h3>Highest HR</h3>
-                    <div id="peak-hr-val" class="stat-val">--</div>
-                    <div id="peak-hr-time" class="stat-sub">--</div>
+            <!-- 4-Stage Connected Pipeline Flow -->
+            <div class="pipeline-flow">
+                <!-- Stage 1 -->
+                <div class="pipeline-node">
+                    <div class="node-badge">STEP 1</div>
+                    <div class="node-icon">🩻</div>
+                    <div class="node-title">AD8232 Acquisition</div>
+                    <div class="node-detail">12-bit SAR ADC capture @ 250 SPS on GPIO36. Contains 50Hz hum and respiration impedance drift.</div>
+                    <div class="node-metric">Noise Level: <strong class="text-amber">High (±35mV)</strong></div>
                 </div>
-                <div class="stat-box">
-                    <h3>Lowest HR</h3>
-                    <div id="low-hr-val" class="stat-val">--</div>
-                    <div id="low-hr-time" class="stat-sub">--</div>
+
+                <div class="node-connector">➔</div>
+
+                <!-- Stage 2 -->
+                <div class="pipeline-node highlight">
+                    <div class="node-badge">STEP 2</div>
+                    <div class="node-icon">⚡</div>
+                    <div class="node-title">DSP Multi-Filter</div>
+                    <div class="node-detail">0.5Hz High-Pass removes DC drift. 50Hz Notch rejects AC hum. 45Hz Butterworth removes EMG tremors.</div>
+                    <div class="node-metric">SNR Gain: <strong class="text-emerald">+23.7 dB</strong></div>
+                </div>
+
+                <div class="node-connector">➔</div>
+
+                <!-- Stage 3 -->
+                <div class="pipeline-node">
+                    <div class="node-badge">STEP 3</div>
+                    <div class="node-icon">🎯</div>
+                    <div class="node-title">Pan-Tompkins QRS</div>
+                    <div class="node-detail">Real-time derivative squaring & moving window integration for accurate R-peak timing.</div>
+                    <div class="node-metric">R-R Live: <strong class="text-cyan" id="metric-rr-live">840 ms</strong></div>
+                </div>
+
+                <div class="node-connector">➔</div>
+
+                <!-- Stage 4 -->
+                <div class="pipeline-node">
+                    <div class="node-badge">STEP 4</div>
+                    <div class="node-icon">🧠</div>
+                    <div class="node-title">TinyML 1D-CNN</div>
+                    <div class="node-detail">Quantized Int8 edge model classifies each 2s window into Normal, Anxious, PVC, or AFib.</div>
+                    <div class="node-metric">Latency: <strong class="text-purple" id="metric-ml-latency">2.4 ms</strong></div>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+
+    </div>
 
     <script src="app.js"></script>
 </body>
